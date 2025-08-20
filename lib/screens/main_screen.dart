@@ -1,8 +1,14 @@
+// 1. --- IMPORT HIVE and other necessary packages ---
+import 'dart:io';
+
 import 'package:book_store/screens/my_library.dart';
 import 'package:book_store/screens/profile_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-import '../main.dart'; // To access the supabase client
+import '../main.dart';
+import '../models/book_model.dart';
 import 'explore_screen.dart';
 import 'home_screen.dart';
 
@@ -16,29 +22,22 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  // --- 1. NEW FUNCTION TO HANDLE NAVIGATION ---
-  // This function changes the state to show the Explore screen (index 2).
   void _navigateToExplore() {
     setState(() {
-      _selectedIndex = 2;
+      _selectedIndex = 2; // Index of ExploreScreen
     });
   }
 
-  // --- 2. CONVERTED THE LIST TO A METHOD ---
-  // This allows us to pass the function to HomeScreen when it's built.
   List<Widget> _buildScreenOptions() {
     return [
-      HomeScreen(
-        onNavigateToExplore: _navigateToExplore,
-      ), // Pass the function here
-      const MyLibraryScreen(),
+      HomeScreen(onNavigateToExplore: _navigateToExplore),
+      const CartScreen(),
       const ExploreScreen(),
       const ProfileScreen(),
     ];
   }
 
-  // List of titles for the AppBar to match the screens
-  static const List<String> _screenTitles = <String>[
+  static const List<String> _screenTitles = [
     'Home',
     'My Library',
     'Explore',
@@ -46,45 +45,69 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   void _onDrawerItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    Navigator.pop(context); // Close the drawer after selection
+    // If the profile screen is selected, we don't want to change the main scaffold's state,
+    // as the ProfileScreen has its own AppBar. This prevents title/button conflicts.
+    // We navigate to it as a separate route instead.
+    if (index == 3) {
+      Navigator.pop(context); // Close the drawer
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+      );
+    } else {
+      setState(() => _selectedIndex = index);
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _signOut() async {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      // You can show a SnackBar here if sign-out fails
-    } finally {
-      if (mounted) {
-        // Navigate back to the login screen and remove all previous routes
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
+    // Also clear local data on sign out for a clean slate
+    await Hive.box<Book>('wishlist_books').clear();
+    await Hive.box('user_profile').clear();
+
+    await supabase.auth.signOut();
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/login');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Call the method to get our list of screens
     final screens = _buildScreenOptions();
 
     return Scaffold(
-      // The AppBar is now part of this main screen, providing consistency
       appBar: AppBar(
-        title: Text(_screenTitles[_selectedIndex]), // Title updates dynamically
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              backgroundImage: NetworkImage("https://i.pravatar.cc/150?img=3"),
-              backgroundColor: Colors.transparent,
-            ),
+        title: Text(_screenTitles[_selectedIndex]),
+        actions: [
+          // --- 2. WRAP the CircleAvatar in a ValueListenableBuilder ---
+          ValueListenableBuilder(
+            // Listen to changes in the 'user_profile' box
+            valueListenable: Hive.box('user_profile').listenable(),
+            builder: (context, Box box, _) {
+              // Get the saved image path from Hive
+              final imagePath = box.get('imagePath');
+
+              // Determine the correct image provider
+              ImageProvider? backgroundImage;
+              if (!kIsWeb && imagePath != null) {
+                backgroundImage = FileImage(File(imagePath));
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: CircleAvatar(
+                  radius: 20,
+                  backgroundImage: backgroundImage,
+                  // Show a placeholder icon if no image is set
+                  child: backgroundImage == null
+                      ? const Icon(Icons.person, size: 22)
+                      : null,
+                ),
+              );
+            },
           ),
         ],
       ),
-      // The drawer provides navigation for the whole app
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -116,23 +139,21 @@ class _MainScreenState extends State<MainScreen> {
               selected: _selectedIndex == 2,
               onTap: () => _onDrawerItemTapped(2),
             ),
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Profile'),
+              selected: _selectedIndex == 3,
+              onTap: () => _onDrawerItemTapped(3),
+            ),
             const Divider(),
-
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
               onTap: _signOut,
             ),
-            ListTile(
-              leading: const Icon(Icons.explore_outlined),
-              title: const Text('Profile'),
-              selected: _selectedIndex == 3,
-              onTap: () => _onDrawerItemTapped(5),
-            ),
           ],
         ),
       ),
-      // The body of the Scaffold displays the currently selected screen
       body: screens.elementAt(_selectedIndex),
     );
   }

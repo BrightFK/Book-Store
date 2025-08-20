@@ -22,9 +22,12 @@ class Book extends HiveObject {
   final double rating;
 
   @HiveField(5)
-  final String description;
+  final String genre;
 
   @HiveField(6)
+  final String description;
+
+  @HiveField(7)
   final double price;
 
   Book({
@@ -33,6 +36,7 @@ class Book extends HiveObject {
     required this.author,
     required this.imageUrl,
     required this.rating,
+    required this.genre,
     required this.description,
     required this.price,
   });
@@ -45,6 +49,7 @@ class Book extends HiveObject {
       imageUrl:
           json['image_url'] as String? ?? 'https://via.placeholder.com/150',
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      genre: json['genre'] as String,
       description:
           json['description'] as String? ?? 'No description available.',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,

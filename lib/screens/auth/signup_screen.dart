@@ -1,3 +1,5 @@
+import 'dart:async'; // Import for TimeoutException
+
 import 'package:book_store/main.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,53 +18,78 @@ class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
+  /// Shows a styled AlertDialog for different error scenarios.
+  void _showErrorDialog(String title, String content) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Shows a success dialog and navigates back on completion.
+  void _showSuccessDialog(String content) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User must tap button to close
+      builder: (context) => AlertDialog(
+        title: const Text('Registration Successful'),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Pop the dialog
+              Navigator.of(context).pop();
+              // Pop the SignUpPage to return to the LoginPage
+              Navigator.of(context).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final result = await supabase.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      await supabase.auth
+          .signUp(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          )
+          .timeout(const Duration(seconds: 15));
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result.session == null
-                  ? 'Please check your email for a confirmation link.'
-                  : 'Sign up successful!',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-        if (result.session != null) {
-          Navigator.of(context).pushReplacementNamed('/home');
-        } else {
-          // If email confirmation is required, pop back to login
-          Navigator.of(context).pop();
-        }
-      }
+      // If signUp is successful, show the success dialog.
+      // Supabase default behavior requires email confirmation.
+      _showSuccessDialog(
+        'Please check your email for a confirmation link to complete your registration.',
+      );
+    } on TimeoutException {
+      _showErrorDialog(
+        'Request Timed Out',
+        'The connection is taking too long. Please check your network and try again.',
+      );
     } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      _showErrorDialog('Sign Up Failed', e.message);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('An unexpected error occurred.'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      _showErrorDialog(
+        'An Unexpected Error Occurred',
+        'Please check your internet connection and try again.',
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -79,6 +106,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
+    // The SingleChildScrollView correctly prevents screen overflow on smaller devices.
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -91,7 +119,7 @@ class _SignUpPageState extends State<SignUpPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
             child: Form(
               key: _formKey,
               child: Column(
@@ -118,8 +146,11 @@ class _SignUpPageState extends State<SignUpPage> {
                     decoration: const InputDecoration(labelText: 'Email'),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'Please enter an email';
+                      }
+                      if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value)) {
+                        return 'Please enter a valid email address';
                       }
                       return null;
                     },
