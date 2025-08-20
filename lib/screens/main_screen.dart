@@ -1,4 +1,5 @@
 import 'package:book_store/screens/my_library.dart';
+import 'package:book_store/screens/profile_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../main.dart'; // To access the supabase client
@@ -32,6 +33,7 @@ class _MainScreenState extends State<MainScreen> {
       ), // Pass the function here
       const MyLibraryScreen(),
       const ExploreScreen(),
+      const ProfileScreen(),
     ];
   }
 
@@ -40,6 +42,7 @@ class _MainScreenState extends State<MainScreen> {
     'Home',
     'My Library',
     'Explore',
+    'Profile',
   ];
 
   void _onDrawerItemTapped(int index) {
@@ -119,6 +122,12 @@ class _MainScreenState extends State<MainScreen> {
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
               onTap: _signOut,
+            ),
+            ListTile(
+              leading: const Icon(Icons.explore_outlined),
+              title: const Text('Profile'),
+              selected: _selectedIndex == 3,
+              onTap: () => _onDrawerItemTapped(5),
             ),
           ],
         ),

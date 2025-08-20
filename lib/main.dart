@@ -1,17 +1,27 @@
 import 'dart:async';
 
+import 'package:book_store/models/book_model.dart'; // Import the book model
 import 'package:book_store/screens/auth/login_screen.dart';
 import 'package:book_store/screens/auth/signup_screen.dart';
-import 'package:book_store/screens/explore_screen.dart';
-// --- MODIFIED: Import MainScreen instead of HomeScreen ---
 import 'package:book_store/screens/main_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive_flutter/hive_flutter.dart'; // Import Hive
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // --- MAIN: App Initialization ---
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // --- 1. HIVE INITIALIZATION ---
+  await Hive.initFlutter();
+  // Register the adapter for our custom Book object
+  // This line requires the 'book_model.g.dart' file to have been generated
+  Hive.registerAdapter(BookAdapter());
+  // Open the boxes we will use throughout the app
+  await Hive.openBox<Book>('wishlist_books');
+  await Hive.openBox('user_profile');
+  // --- END HIVE INITIALIZATION ---
 
   // Initialize Supabase
   await Supabase.initialize(
@@ -31,7 +41,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Define a color scheme and theme that matches the UI
     const primaryColor = Color(0xFF1E7C65);
     const backgroundColor = Color(0xFFF3F7F5);
     const textColor = Color(0xFF212121);
@@ -40,7 +49,7 @@ class MyApp extends StatelessWidget {
       title: 'Book Explorer',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // (Your theme data remains unchanged)
+        // (Your theme data is correct and unchanged)
         useMaterial3: true,
         scaffoldBackgroundColor: backgroundColor,
         colorScheme: ColorScheme.fromSeed(
@@ -92,10 +101,9 @@ class MyApp extends StatelessWidget {
         '/': (context) => const SplashPage(),
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
-        // --- CRITICAL CHANGE HERE ---
-        // The '/home' route now points to our new navigation hub
         '/home': (context) => const MainScreen(),
-        '/explore': (context) => const ExploreScreen(),
+        // Note: The '/explore' route is not needed since ExploreScreen is
+        // handled by MainScreen, but it doesn't hurt to leave it.
       },
     );
   }
@@ -117,7 +125,6 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _redirect() async {
-    // A small delay to ensure the widget is built
     await Future.delayed(Duration.zero);
     if (!mounted) return;
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
+import '../main.dart';
 import '../models/book_model.dart';
 
 // We convert the widget to a StatefulWidget to manage the quantity.
@@ -13,24 +15,56 @@ class BookDetailScreen extends StatefulWidget {
 }
 
 class _BookDetailScreenState extends State<BookDetailScreen> {
-  // State variable to hold the current quantity
+  late final Box<Book> _wishlistBox;
+  bool _isBookmarked = false;
   int _quantity = 1;
 
-  // Method to increase quantity
-  void _incrementQuantity() {
-    setState(() {
-      _quantity++;
-    });
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _wishlistBox = Hive.box<Book>('wishlist_books');
+    // Instantly check if the book is already in the local Hive box
+    _isBookmarked = _wishlistBox.containsKey(widget.book.id);
   }
 
-  // Method to decrease quantity, ensuring it doesn't go below 1
-  void _decrementQuantity() {
-    if (_quantity > 1) {
-      setState(() {
-        _quantity--;
-      });
+  Future<void> _toggleBookmark() async {
+    final bookId = widget.book.id;
+    final userId = supabase.auth.currentUser?.id;
+
+    // Optimistic UI update: change the icon immediately
+    setState(() {
+      _isBookmarked = !_isBookmarked;
+    });
+
+    if (_isBookmarked) {
+      // Add to local Hive box
+      await _wishlistBox.put(bookId, widget.book);
+      // Sync with Supabase in the background
+      if (userId != null) {
+        await supabase.from('wishlist_items').insert({
+          'user_id': userId,
+          'book_id': bookId,
+        });
+      }
+    } else {
+      // Remove from local Hive box
+      await _wishlistBox.delete(bookId);
+      // Sync with Supabase in the background
+      if (userId != null) {
+        await supabase.from('wishlist_items').delete().match({
+          'user_id': userId,
+          'book_id': bookId,
+        });
+      }
     }
   }
+
+  // (Quantity logic is unchanged)
+  void _incrementQuantity() => setState(() => _quantity++);
+
+  void _decrementQuantity() =>
+      setState(() => _quantity > 1 ? _quantity-- : null);
 
   @override
   Widget build(BuildContext context) {
@@ -120,8 +154,13 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
               ],
             ),
             child: IconButton(
-              icon: const Icon(Icons.bookmark_border, color: Colors.black),
-              onPressed: () {},
+              icon: Icon(
+                _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                color: _isBookmarked
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.black,
+              ),
+              onPressed: _toggleBookmark, // Call our new function
             ),
           ),
         ),
