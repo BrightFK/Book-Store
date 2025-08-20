@@ -1,3 +1,4 @@
+import 'package:book_store/screens/my_library.dart';
 import 'package:flutter/material.dart';
 
 import '../main.dart'; // To access the supabase client
@@ -29,7 +30,7 @@ class _MainScreenState extends State<MainScreen> {
       HomeScreen(
         onNavigateToExplore: _navigateToExplore,
       ), // Pass the function here
-      const Center(child: Text('My Library Screen')),
+      const MyLibraryScreen(),
       const ExploreScreen(),
     ];
   }

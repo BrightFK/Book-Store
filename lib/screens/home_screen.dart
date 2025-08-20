@@ -14,10 +14,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // --- STATE VARIABLES ---
   late Future<void> _initDataFuture;
   List<Book> _popularBooks = [];
   List<Book> _trendingBooks = [];
   bool _showAllTrending = false;
+  Set<String> _wishlistedBookIds = {};
 
   @override
   void initState() {
@@ -25,13 +27,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _initDataFuture = _fetchHomeScreenData();
   }
 
+  // --- DATA FETCHING AND LOGIC METHODS ---
+
   Future<void> _fetchHomeScreenData() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
     final responses = await Future.wait([
       supabase.from('books').select().eq('is_bestseller', true).limit(5),
       supabase.from('books').select().eq('is_new_arrival', true).limit(8),
+      supabase.from('wishlist_items').select('book_id').eq('user_id', userId),
     ]);
 
-    if (responses[0] == null || responses[1] == null) {
+    if (responses.any((res) => res == null)) {
       throw Exception('Failed to load book data');
     }
 
@@ -42,9 +50,35 @@ class _HomeScreenState extends State<HomeScreen> {
       _trendingBooks = (responses[1] as List)
           .map((json) => Book.fromJson(json))
           .toList();
+      final wishlistResponse = responses[2] as List;
+      _wishlistedBookIds = wishlistResponse
+          .map((item) => item['book_id'] as String)
+          .toSet();
     });
   }
 
+  Future<void> _toggleWishlist(String bookId) async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    final isWishlisted = _wishlistedBookIds.contains(bookId);
+
+    if (isWishlisted) {
+      await supabase.from('wishlist_items').delete().match({
+        'user_id': userId,
+        'book_id': bookId,
+      });
+      setState(() => _wishlistedBookIds.remove(bookId));
+    } else {
+      await supabase.from('wishlist_items').insert({
+        'user_id': userId,
+        'book_id': bookId,
+      });
+      setState(() => _wishlistedBookIds.add(bookId));
+    }
+  }
+
+  // --- SINGLE, COMPLETE BUILD METHOD ---
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
@@ -83,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- WIDGET BUILDER METHODS ---
+  // --- ALL HELPER METHODS ARE NOW CORRECTLY PLACED HERE ---
 
   Widget _buildSearchBar() {
     return TextField(
@@ -125,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: books.length,
         itemBuilder: (context, index) {
           final book = books[index];
+          // We can add wishlist icons here later if needed
           return GestureDetector(
             onTap: () => Navigator.push(
               context,
@@ -167,17 +202,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- THIS METHOD HAS BEEN RESTORED ---
   Widget _buildTrendingBooksList(List<Book> books) {
-    // Decide how many items to show based on the state.
-    // Also, ensure we don't try to show more items than we have.
     final itemCount = _showAllTrending
         ? books.length
         : (books.length > 4 ? 4 : books.length);
 
     return Column(
       children: [
-        // This ListView builds the vertical list of books
         ListView.builder(
           itemCount: itemCount,
           shrinkWrap: true,
@@ -188,7 +219,6 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
         const SizedBox(height: 16),
-        // This button will only show if there are more than 4 books to display
         if (books.length > 4)
           TextButton(
             onPressed: () {
@@ -208,8 +238,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Helper widget for a single item in the trending list
   Widget _buildTrendingBookItem(Book book) {
+    final isWishlisted = _wishlistedBookIds.contains(book.id);
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -250,10 +281,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             IconButton(
               icon: Icon(
-                Icons.bookmark_border_outlined,
-                color: Colors.grey[600],
+                isWishlisted ? Icons.bookmark : Icons.bookmark_border_outlined,
+                color: isWishlisted
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey[600],
               ),
-              onPressed: () {},
+              onPressed: () => _toggleWishlist(book.id),
             ),
           ],
         ),
