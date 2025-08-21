@@ -1,4 +1,3 @@
-import 'package:book_store/main.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -163,25 +162,14 @@ class _BottomActionBarState extends State<_BottomActionBar> {
   void _decrementQuantity() =>
       setState(() => _quantity > 1 ? _quantity-- : null);
 
-  // <-- NEW: Logic to add the book and its quantity to the cart
   Future<void> _addToCart() async {
     final wishlistBox = Hive.box<Book>('wishlist_books');
     final quantityBox = Hive.box<int>('cart_quantities');
-    final userId = supabase.auth.currentUser?.id;
 
     // Add/update the book in the wishlist box
     await wishlistBox.put(widget.book.id, widget.book);
     // Add/update the quantity in the quantity box
     await quantityBox.put(widget.book.id, _quantity);
-
-    // Sync with Supabase using upsert for quantity
-    if (userId != null) {
-      await supabase.from('wishlist_items').upsert({
-        'user_id': userId,
-        'book_id': widget.book.id,
-        'quantity': _quantity, // Make sure you added this column in Supabase
-      }, onConflict: 'user_id, book_id');
-    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

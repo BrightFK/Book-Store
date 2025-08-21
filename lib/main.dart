@@ -21,6 +21,7 @@ Future<void> main() async {
   // Open the boxes we will use throughout the app
   await Hive.openBox<Book>('wishlist_books');
   await Hive.openBox('user_profile');
+  await Hive.openBox<int>('cart_quantities');
   // --- END HIVE INITIALIZATION ---
 
   // Initialize Supabase

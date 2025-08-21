@@ -50,7 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Book> _popularBooks = [];
   List<Book> _trendingBooks = [];
   bool _showAllTrending = false;
-  Set<String> _wishlistedBookIds = {};
 
   // --- SEARCH AND FILTER STATE VARIABLES ---
   late final TextEditingController _searchController;
@@ -85,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final responses = await Future.wait([
       supabase.from('books').select().eq('is_bestseller', true).limit(5),
       supabase.from('books').select().eq('is_new_arrival', true).limit(8),
-      supabase.from('wishlist_items').select('book_id').eq('user_id', userId),
     ]);
 
     if (!mounted) return;
@@ -101,33 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _trendingBooks = (responses[1] as List)
           .map((json) => Book.fromJson(json))
           .toList();
-      final wishlistResponse = responses[2] as List;
-      _wishlistedBookIds = wishlistResponse
-          .map((item) => item['book_id'] as String)
-          .toSet();
     });
-  }
-
-  // ... ( _toggleWishlist method remains unchanged ) ...
-  Future<void> _toggleWishlist(String bookId) async {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
-
-    final isWishlisted = _wishlistedBookIds.contains(bookId);
-
-    if (isWishlisted) {
-      await supabase.from('wishlist_items').delete().match({
-        'user_id': userId,
-        'book_id': bookId,
-      });
-      if (mounted) setState(() => _wishlistedBookIds.remove(bookId));
-    } else {
-      await supabase.from('wishlist_items').insert({
-        'user_id': userId,
-        'book_id': bookId,
-      });
-      if (mounted) setState(() => _wishlistedBookIds.add(bookId));
-    }
   }
 
   // --- SEARCH LOGIC METHODS ---

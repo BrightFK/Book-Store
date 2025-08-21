@@ -39,7 +39,7 @@ class _MainScreenState extends State<MainScreen> {
 
   static const List<String> _screenTitles = [
     'Home',
-    'My Library',
+    'My Cart',
     'Explore',
     'Profile',
   ];
@@ -129,7 +129,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.collections_bookmark_outlined),
-              title: const Text('My Library'),
+              title: const Text('My Cart'),
               selected: _selectedIndex == 1,
               onTap: () => _onDrawerItemTapped(1),
             ),
